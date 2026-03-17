@@ -1,4 +1,4 @@
-# test
+# Deckstorm
 
 This project was created with [Better Fullstack](https://github.com/Marve10s/Better-Fullstack), a modern TypeScript stack that combines React, Vite SPA, Express, and more.
 
@@ -48,7 +48,7 @@ The API is running at [http://localhost:3000](http://localhost:3000).
 ## Project Structure
 
 ```
-test/
+Deckstorm/
 ├── apps/
 │   ├── web/         # Frontend application (React + Vite SPA)
 │   └── server/      # Backend API (Express)

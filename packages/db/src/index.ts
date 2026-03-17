@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { env } from "@test/env/server";
+import { env } from "@deckstorm/env/server";
 
 import { PrismaClient } from "../prisma/generated/client";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@test/auth",
+  "name": "@deckstorm/auth",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -14,14 +14,14 @@
   "scripts": {},
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.5.1",
-    "@test/db": "*",
-    "@test/env": "*",
+    "@deckstorm/db": "*",
+    "@deckstorm/env": "*",
     "better-auth": "^1.5.1",
     "dotenv": "^17.2.2",
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@test/config": "*",
+    "@deckstorm/config": "*",
     "typescript": "^5"
   }
 }

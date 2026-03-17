@@ -1,5 +1,5 @@
 {
-  "extends": "@test/config/tsconfig.base.json",
+  "extends": "@deckstorm/config/tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",

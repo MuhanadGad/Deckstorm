@@ -1,5 +1,5 @@
-import { auth } from "@test/auth";
-import { env } from "@test/env/server";
+import { auth } from "@deckstorm/auth";
+import { env } from "@deckstorm/env/server";
 import { toNodeHandler } from "better-auth/node";
 import cors from "cors";
 import express from "express";

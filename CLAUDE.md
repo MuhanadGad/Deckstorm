@@ -1,4 +1,4 @@
-# test
+# Deckstorm
 
 This file provides context about the project for AI assistants.
 
@@ -41,7 +41,7 @@ This file provides context about the project for AI assistants.
 ## Project Structure
 
 ```
-test/
+Deckstorm/
 ├── apps/
 │   ├── web/         # Frontend application
 │   └── server/      # Backend API

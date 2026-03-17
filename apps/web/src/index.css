@@ -74,7 +74,7 @@
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", sans-serif;
+  --font-sans: "Inter Variable", "Trebuchet MS", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -116,6 +116,13 @@
 }
 
 @layer base {
+  html,
+  body,
+  #app {
+    height: 100svh;
+    overflow: hidden;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -124,5 +131,141 @@
   }
   html {
     @apply font-sans;
+  }
+
+  body::before {
+    background:
+      radial-gradient(circle at top, rgb(241 195 110 / 0.08), transparent 28%),
+      linear-gradient(135deg, rgb(8 13 20), rgb(17 33 41) 45%, rgb(8 34 30));
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: fixed;
+    z-index: -2;
+  }
+}
+
+@layer components {
+  .table-felt {
+    background:
+      radial-gradient(circle at 50% 50%, rgb(61 118 104 / 0.28), transparent 38%),
+      radial-gradient(circle at 50% 50%, rgb(10 18 23), rgb(6 10 14) 70%);
+  }
+
+  .table-ring {
+    background:
+      linear-gradient(180deg, rgb(255 233 183 / 0.12), transparent 20%, transparent 80%, rgb(88 197 168 / 0.12)),
+      linear-gradient(135deg, rgb(255 255 255 / 0.08), transparent 30%, transparent 70%, rgb(255 255 255 / 0.05));
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.07),
+      0 0 0 1px rgb(0 0 0 / 0.2);
+  }
+
+  .card-slot {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.02)),
+      radial-gradient(circle at top, rgb(252 235 188 / 0.12), transparent 55%),
+      linear-gradient(180deg, rgb(7 11 16 / 0.92), rgb(12 24 30 / 0.96));
+    border: 1px solid rgb(255 255 255 / 0.12);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.04),
+      inset 0 1px 16px rgb(255 255 255 / 0.03),
+      0 14px 24px rgb(0 0 0 / 0.22);
+    position: relative;
+  }
+
+  .card-slot-faceup {
+    background:
+      linear-gradient(180deg, rgb(255 252 245 / 0.98), rgb(247 236 214 / 0.98)),
+      radial-gradient(circle at top, rgb(255 255 255 / 0.7), transparent 52%),
+      linear-gradient(180deg, rgb(207 176 132 / 0.18), transparent 58%);
+    border: 1px solid rgb(119 82 45 / 0.18);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.38),
+      inset 0 1px 18px rgb(255 255 255 / 0.24),
+      0 18px 28px rgb(0 0 0 / 0.18);
+  }
+
+  .card-slot::before {
+    background:
+      linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), transparent),
+      linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 26%);
+    border-radius: inherit;
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .card-slot::after {
+    border: 1px dashed rgb(255 255 255 / 0.12);
+    border-radius: calc(var(--radius-2xl) - 0.2rem);
+    content: "";
+    inset: 0.75rem;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .card-slot-faceup::after {
+    border-color: rgb(119 82 45 / 0.16);
+    inset: 0.55rem;
+  }
+
+  .card-slot-hidden {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.015)),
+      repeating-linear-gradient(
+        135deg,
+        rgb(255 255 255 / 0.025) 0,
+        rgb(255 255 255 / 0.025) 8px,
+        transparent 8px,
+        transparent 16px
+      ),
+      linear-gradient(180deg, rgb(16 18 30 / 0.94), rgb(8 10 18 / 0.98));
+  }
+
+  .hand-row {
+    perspective: 1200px;
+  }
+
+  .hand-card {
+    transform-origin: center bottom;
+    will-change: transform;
+  }
+
+  .hand-card[data-revealed="true"] {
+    --hand-card-scale: 1;
+    --hand-card-shift-y: 0rem;
+    transform: translateY(var(--hand-card-shift-y)) scale(var(--hand-card-scale));
+  }
+
+  .hand-row-dock:has(.hand-card[data-revealed="true"]:hover)
+    .hand-card[data-revealed="true"]:hover {
+    --hand-card-scale: 1.15;
+    --hand-card-shift-y: -1.2rem;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.42),
+      inset 0 1px 20px rgb(255 255 255 / 0.24),
+      0 28px 40px rgb(0 0 0 / 0.24);
+    filter: saturate(1.03) brightness(1.02);
+    z-index: 30;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hand-card[data-revealed="true"] {
+      --hand-card-scale: 1;
+      --hand-card-shift-y: 0rem;
+    }
+
+    .hand-row-dock:has(.hand-card[data-revealed="true"]:hover)
+      .hand-card[data-revealed="true"]:hover {
+      box-shadow:
+        inset 0 0 0 1px rgb(255 255 255 / 0.38),
+        inset 0 1px 18px rgb(255 255 255 / 0.24),
+        0 18px 28px rgb(0 0 0 / 0.18);
+      filter: none;
+      --hand-card-scale: 1;
+      --hand-card-shift-y: 0rem;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { env } from "@test/env/web";
+import { env } from "@deckstorm/env/web";
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({

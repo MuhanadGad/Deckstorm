@@ -1,10 +1,13 @@
-import { Outlet } from "react-router";
+import { Outlet, useLocation } from "react-router";
 
 import Header from "@/components/header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 function RoutedLayout() {
+  const location = useLocation();
+  const showHeader = location.pathname !== "/";
+
   return (
     <ThemeProvider
       attribute="class"
@@ -12,8 +15,10 @@ function RoutedLayout() {
       disableTransitionOnChange
       storageKey="vite-ui-theme"
     >
-      <div className="grid h-svh grid-rows-[auto_1fr]">
-        <Header />
+      <div
+        className={showHeader ? "grid h-svh overflow-hidden grid-rows-[auto_1fr]" : "h-svh overflow-hidden"}
+      >
+        {showHeader ? <Header /> : null}
         <Outlet />
       </div>
       <Toaster richColors />

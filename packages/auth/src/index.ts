@@ -1,5 +1,5 @@
-import prisma from "@test/db";
-import { env } from "@test/env/server";
+import prisma from "@deckstorm/db";
+import { env } from "@deckstorm/env/server";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 

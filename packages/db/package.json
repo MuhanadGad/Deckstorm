@@ -1,5 +1,5 @@
 {
-  "name": "@test/db",
+  "name": "@deckstorm/db",
   "type": "module",
   "exports": {
     ".": {
@@ -19,13 +19,13 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
-    "@test/env": "*",
+    "@deckstorm/env": "*",
     "dotenv": "^17.2.2",
     "pg": "^8.16.3",
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@test/config": "*",
+    "@deckstorm/config": "*",
     "@types/pg": "^8.18.0",
     "prisma": "^7.4.1",
     "typescript": "^5"
