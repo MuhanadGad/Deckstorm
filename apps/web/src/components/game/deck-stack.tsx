@@ -21,11 +21,11 @@ export default function DeckStack({
       )}
     >
       <div className="relative h-30 w-20 sm:h-34 sm:w-[5.4rem] lg:h-38 lg:w-[5.9rem]">
-        <div className="card-slot card-slot-hidden absolute inset-x-2 top-2 rounded-[1.4rem] opacity-50" />
-        <div className="card-slot card-slot-hidden absolute inset-x-1 top-1 rounded-[1.4rem] opacity-70" />
+        <div className="card-slot card-slot-hidden absolute inset-x-2 top-2 rounded-[1rem] opacity-50" />
+        <div className="card-slot card-slot-hidden absolute inset-x-1 top-1 rounded-[1rem] opacity-70" />
         <div
           ref={cardRef}
-          className="card-slot card-slot-hidden absolute inset-0 rounded-[1.4rem]"
+          className="card-slot card-slot-hidden absolute inset-0 rounded-[1rem]"
         />
       </div>
 

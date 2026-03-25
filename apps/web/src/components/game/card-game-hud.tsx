@@ -1,8 +1,11 @@
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 import BoardRow from "./board-row";
 import DeckStack from "./deck-stack";
+import GameCardFace, { type GameCardData } from "./game-card-face";
 import HandRow from "./hand-row";
 import PlayerProfile from "./player-profile";
 
@@ -31,6 +34,77 @@ type FlyingCard = {
   toY: number;
 };
 
+type DragState = {
+  card: GameCardData;
+  cardId: string;
+  height: number;
+  overPlayerField: boolean;
+  pointerOffsetX: number;
+  pointerOffsetY: number;
+  rotation: number;
+  targetIndex: number | null;
+  width: number;
+  x: number;
+  y: number;
+};
+
+const PLAYER_STARTING_HAND: GameCardData[] = [
+  {
+    attack: 4,
+    body: "On play: Draw 1 card. If this is your second action, gain 1 energy.",
+    cost: 2,
+    defense: 3,
+    id: "sunsteel-scout",
+    title: "Scout",
+    type: "Vanguard",
+  },
+  {
+    attack: 3,
+    body: "Guard. Nearby allies in the FIELD gain +1 defense until your next turn.",
+    cost: 3,
+    defense: 5,
+    id: "bastion-herald",
+    title: "Herald",
+    type: "Sentinel",
+  },
+  {
+    attack: 5,
+    body: "Quick strike. Deal 2 bonus damage if the target already took damage this round.",
+    cost: 4,
+    defense: 2,
+    id: "ashfall-duelist",
+    title: "Duelist",
+    type: "Skirmisher",
+  },
+  {
+    attack: 2,
+    body: "Create a Spark in your HAND. Sparks cost 1 less and cycle when played.",
+    cost: 1,
+    defense: 4,
+    id: "ember-scribe",
+    title: "Scribe",
+    type: "Invoker",
+  },
+  {
+    attack: 6,
+    body: "Heavy. At end of turn, fortify the leftmost ally on the FIELD for 2.",
+    cost: 5,
+    defense: 6,
+    id: "ironroot-colossus",
+    title: "Colossus",
+    type: "Titan",
+  },
+  {
+    attack: 1,
+    body: "When discarded, return this to your HAND with +2 attack next turn.",
+    cost: 2,
+    defense: 1,
+    id: "echo-wisp",
+    title: "Wisp",
+    type: "Spirit",
+  },
+];
+
 function buildFlightTransform(card: FlyingCard) {
   const x = card.phase === "moving" ? card.toX : card.fromX;
   const y = card.phase === "moving" ? card.toY : card.fromY;
@@ -40,9 +114,21 @@ function buildFlightTransform(card: FlyingCard) {
   return `translate3d(${x}px, ${y}px, 0) rotate(${rotation}deg)${flip}`;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function createEmptyField() {
+  return Array.from({ length: BOARD_SLOT_COUNT }, () => null as GameCardData | null);
+}
+
 export default function CardGameHud() {
   const [opponentHandCount, setOpponentHandCount] = useState(0);
-  const [playerHandCount, setPlayerHandCount] = useState(0);
+  const [playerHandCards, setPlayerHandCards] = useState<GameCardData[]>([]);
+  const [playerFieldCards, setPlayerFieldCards] = useState<(GameCardData | null)[]>(
+    createEmptyField,
+  );
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [flyingCards, setFlyingCards] = useState<FlyingCard[]>([]);
 
   const hudRef = useRef<HTMLElement | null>(null);
@@ -50,9 +136,14 @@ export default function CardGameHud() {
   const playerDeckRef = useRef<HTMLDivElement | null>(null);
   const opponentHandRefs = useRef<(HTMLDivElement | null)[]>([]);
   const playerHandRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const playerFieldZoneRef = useRef<HTMLDivElement | null>(null);
+  const playerFieldRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const playerFieldCardsRef = useRef<(GameCardData | null)[]>(createEmptyField());
   const timeoutIdsRef = useRef<number[]>([]);
   const animationFrameIdsRef = useRef<number[]>([]);
   const hasStartedRef = useRef(false);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
 
   const activeDrawCounts = flyingCards.reduce(
     (counts, card) => {
@@ -62,8 +153,150 @@ export default function CardGameHud() {
     { opponent: 0, player: 0 },
   );
 
+  const playerHandCount = playerHandCards.length;
+  const playerFieldCount = playerFieldCards.reduce(
+    (count, card) => count + (card ? 1 : 0),
+    0,
+  );
   const opponentDeckCount = DECK_SIZE - opponentHandCount - activeDrawCounts.opponent;
-  const playerDeckCount = DECK_SIZE - playerHandCount - activeDrawCounts.player;
+  const playerDeckCount =
+    DECK_SIZE - playerHandCount - playerFieldCount - activeDrawCounts.player;
+
+  const syncDragState = (nextDragState: DragState | null) => {
+    dragStateRef.current = nextDragState;
+    setDragState(nextDragState);
+  };
+
+  const getPlayerFieldDropState = (clientX: number, clientY: number) => {
+    const playerFieldZoneBounds = playerFieldZoneRef.current?.getBoundingClientRect();
+
+    if (!playerFieldZoneBounds) {
+      return { overPlayerField: false, targetIndex: null as number | null };
+    }
+
+    const dropPadding = 28;
+    const overPlayerField =
+      clientX >= playerFieldZoneBounds.left - dropPadding &&
+      clientX <= playerFieldZoneBounds.right + dropPadding &&
+      clientY >= playerFieldZoneBounds.top - dropPadding &&
+      clientY <= playerFieldZoneBounds.bottom + dropPadding;
+
+    if (!overPlayerField) {
+      return { overPlayerField: false, targetIndex: null as number | null };
+    }
+
+    let targetIndex: number | null = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    playerFieldRefs.current.forEach((slotNode, index) => {
+      if (!slotNode || playerFieldCardsRef.current[index]) {
+        return;
+      }
+
+      const slotBounds = slotNode.getBoundingClientRect();
+      const centerX = slotBounds.left + slotBounds.width / 2;
+      const centerY = slotBounds.top + slotBounds.height / 2;
+      const distance = (centerX - clientX) ** 2 + (centerY - clientY) ** 2;
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        targetIndex = index;
+      }
+    });
+
+    return { overPlayerField, targetIndex };
+  };
+
+  const handlePlayerCardPointerDown = (
+    card: GameCardData,
+    _index: number,
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if ((event.pointerType === "mouse" && event.button !== 0) || dragStateRef.current) {
+      return;
+    }
+
+    const hudBounds = hudRef.current?.getBoundingClientRect();
+    const cardBounds = event.currentTarget.getBoundingClientRect();
+
+    if (!hudBounds) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const pointerOffsetX = event.clientX - cardBounds.left;
+    const pointerOffsetY = event.clientY - cardBounds.top;
+
+    const updateDragPosition = (clientX: number, clientY: number) => {
+      const dropState = getPlayerFieldDropState(clientX, clientY);
+
+      syncDragState({
+        card,
+        cardId: card.id,
+        height: cardBounds.height,
+        overPlayerField: dropState.overPlayerField,
+        pointerOffsetX,
+        pointerOffsetY,
+        rotation: clamp((clientX - (cardBounds.left + cardBounds.width / 2)) / 22, -9, 9),
+        targetIndex: dropState.targetIndex,
+        width: cardBounds.width,
+        x: clientX - hudBounds.left - pointerOffsetX,
+        y: clientY - hudBounds.top - pointerOffsetY,
+      });
+    };
+
+    const clearListeners = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+      window.removeEventListener("blur", handlePointerCancel);
+      document.body.style.removeProperty("user-select");
+      dragCleanupRef.current = null;
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      updateDragPosition(moveEvent.clientX, moveEvent.clientY);
+    };
+
+    const handlePointerCancel = () => {
+      clearListeners();
+      syncDragState(null);
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      const dropState = getPlayerFieldDropState(upEvent.clientX, upEvent.clientY);
+      const canPlayCard =
+        dropState.targetIndex !== null &&
+        !playerFieldCardsRef.current[dropState.targetIndex];
+
+      clearListeners();
+
+      if (canPlayCard) {
+        setPlayerHandCards((currentCards) =>
+          currentCards.filter((currentCard) => currentCard.id !== card.id),
+        );
+        setPlayerFieldCards((currentCards) => {
+          const nextCards = [...currentCards];
+          nextCards[dropState.targetIndex!] = card;
+          return nextCards;
+        });
+      }
+
+      syncDragState(null);
+    };
+
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = clearListeners;
+    document.body.style.setProperty("user-select", "none");
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
+    window.addEventListener("blur", handlePointerCancel);
+
+    updateDragPosition(event.clientX, event.clientY);
+  };
 
   const createFlight = (owner: Side, index: number) => {
     const hudBounds = hudRef.current?.getBoundingClientRect();
@@ -97,6 +330,10 @@ export default function CardGameHud() {
   };
 
   useEffect(() => {
+    playerFieldCardsRef.current = playerFieldCards;
+  }, [playerFieldCards]);
+
+  useEffect(() => {
     if (hasStartedRef.current) {
       return;
     }
@@ -108,6 +345,7 @@ export default function CardGameHud() {
       animationFrameIdsRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId));
       timeoutIdsRef.current = [];
       animationFrameIdsRef.current = [];
+      dragCleanupRef.current?.();
     };
 
     const settleCard = (owner: Side) => {
@@ -116,7 +354,10 @@ export default function CardGameHud() {
         return;
       }
 
-      setPlayerHandCount((currentCount) => Math.min(currentCount + 1, STARTING_HAND_COUNT));
+      setPlayerHandCards((currentCards) => {
+        const nextCard = PLAYER_STARTING_HAND[currentCards.length];
+        return nextCard ? [...currentCards, nextCard] : currentCards;
+      });
     };
 
     const launchDraw = (owner: Side, index: number) => {
@@ -170,7 +411,7 @@ export default function CardGameHud() {
 
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         setOpponentHandCount(STARTING_HAND_COUNT);
-        setPlayerHandCount(STARTING_HAND_COUNT);
+        setPlayerHandCards(PLAYER_STARTING_HAND.slice(0, STARTING_HAND_COUNT));
         return;
       }
 
@@ -218,12 +459,29 @@ export default function CardGameHud() {
             <div
               key={card.id}
               aria-hidden
-              className="card-slot card-slot-hidden absolute left-0 top-0 rounded-[1.4rem] shadow-[0_18px_30px_rgba(0,0,0,0.34)] will-change-transform"
+              className="card-slot card-slot-hidden absolute left-0 top-0 rounded-[1rem] shadow-[0_18px_30px_rgba(0,0,0,0.34)] will-change-transform"
               style={style}
             />
           );
         })}
       </div>
+      {dragState ? (
+        <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute left-0 top-0 overflow-hidden rounded-[1.1rem] shadow-[0_36px_70px_rgba(0,0,0,0.34)]"
+            style={{
+              height: dragState.height,
+              transform: `translate3d(${dragState.x}px, ${dragState.y}px, 0) rotate(${dragState.rotation}deg) scale(1.04)`,
+              width: dragState.width,
+            }}
+          >
+            <div className="card-slot card-slot-faceup h-full w-full overflow-hidden rounded-[inherit]">
+              <GameCardFace card={dragState.card} />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="relative z-10 grid h-full w-full gap-3 rounded-[1.8rem] border border-white/10 bg-black/20 px-3 py-3 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-sm sm:px-4 sm:py-4 lg:grid-cols-[15rem_minmax(0,1fr)_15rem] lg:gap-6 lg:px-6 lg:py-5">
         <aside className="flex min-h-0 flex-col justify-between gap-3 rounded-[1.55rem] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015)),linear-gradient(180deg,rgba(4,10,14,0.24),rgba(7,20,18,0.3))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-4">
@@ -261,14 +519,31 @@ export default function CardGameHud() {
 
             <div className="h-px w-full bg-gradient-to-r from-transparent via-amber-200/45 to-transparent" />
 
-            <div className="grid gap-2 rounded-[1.55rem] border border-white/10 bg-black/18 px-2.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-3.5 sm:py-3.5 lg:px-4 lg:py-4">
-              <BoardRow slotCount={BOARD_SLOT_COUNT} size="compact" />
+            <div
+              ref={playerFieldZoneRef}
+              className={cn(
+                "grid gap-2 rounded-[1.55rem] border border-white/10 bg-black/18 px-2.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-3.5 sm:py-3.5 lg:px-4 lg:py-4",
+                dragState?.overPlayerField && "player-field-zone-active",
+              )}
+            >
+              <BoardRow
+                cards={playerFieldCards}
+                dropActive={Boolean(dragState)}
+                highlightedIndex={dragState?.targetIndex ?? null}
+                slotCount={BOARD_SLOT_COUNT}
+                size="compact"
+                slotRefs={playerFieldRefs}
+              />
             </div>
           </div>
 
           <div className="flex shrink-0 items-end justify-center gap-3 sm:gap-4">
             <HandRow
+              cards={playerHandCards}
               cardCount={playerHandCount}
+              dockHoverEnabled={!dragState}
+              draggedCardId={dragState?.cardId ?? null}
+              onCardPointerDown={handlePlayerCardPointerDown}
               slotCount={STARTING_HAND_COUNT}
               size="player"
               slotRefs={playerHandRefs}
